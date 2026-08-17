@@ -235,6 +235,24 @@ h1 {
   font-size: 0.92rem;
 }
 
+.save-status {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin: 0 0 14px;
+}
+
+.save-status.save-pending {
+  color: var(--text-muted);
+}
+
+.save-status.save-ok {
+  color: #7fbf6a;
+}
+
+.save-status.save-error {
+  color: var(--accent-2);
+}
+
 .chart-wrap {
   background: var(--surface);
   border: 1px solid var(--border);

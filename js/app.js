@@ -1,5 +1,6 @@
 import { QUESTIONS, ELEMENTS, ELEMENT_LABELS, ELEMENT_ICONS } from "./data.js";
 import { computeScores, checkValidity, getAnalysis, isQuestionComplete, allQuestionsComplete } from "./scoring.js";
+import { saveResult } from "./repository.js";
 
 const STORAGE_KEY = "sc-perfil-tactico:draft";
 const SCALE_LABELS = { 1: "No lo haría", 2: "Poco probable", 3: "Podría hacerlo", 4: "Bastante mi estilo", 5: "Así soy" };
@@ -184,6 +185,7 @@ function renderResult() {
   app.innerHTML = `
     <div class="screen screen-result">
       <p class="eyebrow">Resultado de ${escapeHtml(state.nombre)}</p>
+      <p class="save-status save-pending" id="save-status">Guardando resultado…</p>
       <h1 class="result-title">
         ${ELEMENT_ICONS[scores.dominant]} ${ELEMENT_LABELS[scores.dominant]}${
           scores.isTied ? ` / ${ELEMENT_ICONS[scores.secondary]} ${ELEMENT_LABELS[scores.secondary]}` : ""
@@ -216,12 +218,36 @@ function renderResult() {
   `;
 
   drawRadarChart(scores);
+  persistResult(scores, validity);
 
   document.getElementById("restart-btn").addEventListener("click", () => {
     clearDraft();
     state = { nombre: "", answers: {}, currentIndex: 0 };
     render();
   });
+}
+
+async function persistResult(scores, validity) {
+  const statusEl = document.getElementById("save-status");
+  try {
+    await saveResult({
+      nombre: state.nombre,
+      scores,
+      respuestaDudosa: validity.respuestaDudosa,
+      answers: state.answers,
+    });
+    clearDraft();
+    if (statusEl) {
+      statusEl.textContent = "Guardado en el registro de la organización ✓";
+      statusEl.className = "save-status save-ok";
+    }
+  } catch (err) {
+    console.error("No se pudo guardar el resultado en Supabase:", err);
+    if (statusEl) {
+      statusEl.textContent = "No se pudo guardar (sin conexión o Supabase no configurado) — tu resultado sigue visible aquí.";
+      statusEl.className = "save-status save-error";
+    }
+  }
 }
 
 function renderAnalysisCard(text, dominantLabel, secondaryLabel) {

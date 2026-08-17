@@ -41,11 +41,12 @@ Implementado en `index.html` / `css/styles.css` / `js/*.js` (estático, sin depe
 
 ## Fase 2 — Base de datos (Supabase)
 
-- [ ] Crear proyecto Supabase gratuito
-- [ ] Tabla `pilotos` (nombre, org, fecha de alta)
-- [ ] Tabla `resultados_test` (piloto_id, fecha, puntuaciones por elemento, respuestas crudas)
-- [ ] Conectar el frontend a Supabase (guardar resultado al enviar el test)
-- [ ] Permitir repetir el test y conservar histórico (no sobrescribir resultados anteriores)
+- [ ] Crear proyecto Supabase gratuito — pendiente de que el usuario lo cree en el dashboard.
+- [x] Tabla `pilotos` (nombre, org, fecha de alta) — SQL listo en `supabase/schema.sql`.
+- [x] Tabla `resultados_test` (piloto_id, fecha, puntuaciones por elemento, respuestas crudas) — SQL listo en `supabase/schema.sql`, incluye políticas RLS para uso sin login.
+- [x] Conectar el frontend a Supabase (guardar resultado al enviar el test) — `js/supabaseClient.js` + `js/repository.js`, con degradación limpia si no hay conexión o faltan credenciales (probado con Playwright).
+- [x] Permitir repetir el test y conservar histórico (no sobrescribir resultados anteriores) — cada envío es un `insert` nuevo en `resultados_test`, nunca un `update`.
+- [ ] Pendiente: rellenar `SUPABASE_URL` / `SUPABASE_ANON_KEY` reales en `js/supabaseClient.js` una vez creado el proyecto.
 
 ## Fase 3 — Panel de pilotos (vista de lista + análisis)
 
