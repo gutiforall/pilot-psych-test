@@ -1,0 +1,16 @@
+name: pilot-psych-api
+
+services:
+  pilot-psych-api:
+    build: .
+    container_name: pilot-psych-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8788:8788"
+    volumes:
+      - pilot_psych_data:/app/data
+
+volumes:
+  pilot_psych_data:

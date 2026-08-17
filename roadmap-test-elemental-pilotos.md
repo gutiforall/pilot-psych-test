@@ -4,8 +4,8 @@ Web gratuita para que los pilotos rellenen el cuestionario desde móvil/PC, con 
 
 ## Stack
 
-- **Frontend:** GitHub Pages (HTML/CSS/JS estático, gratis)
-- **Base de datos:** Supabase (capa gratuita — Postgres + API JS directa desde el frontend)
+- **Frontend:** GitHub Pages (HTML/CSS/JS estático, gratis) — repo público `pilot-psych-test`
+- **Base de datos / API:** backend propio (Express + Prisma + SQLite) en la Raspberry Pi del usuario, vía Cloudflare Tunnel — pivote desde el plan original de Supabase (bloqueado el 17/08/2026 por un incidente de GitHub que impedía el login OAuth; ver `brief-proyecto.md`)
 - **Análisis:** generado por reglas/plantillas en JavaScript (sin LLM, sin coste, resultado instantáneo)
 - **Gráficos:** Chart.js (radar chart por piloto, gratis)
 
@@ -39,14 +39,19 @@ Implementado en `index.html` / `css/styles.css` / `js/*.js` (estático, sin depe
 - [x] Pantalla de resultado: porcentajes + texto de análisis (con caso de empate/perfil híbrido) + radar chart.
 - [x] Probado end-to-end con Playwright (flujo completo, navegación atrás/adelante, reanudar borrador, perfil muy marcado, perfil empatado, detección de respuesta dudosa) — sin errores de consola.
 
-## Fase 2 — Base de datos (Supabase)
+## Fase 2 — Base de datos / API (pivote: backend propio en la Raspberry Pi) ✅ completada
 
-- [ ] Crear proyecto Supabase gratuito — pendiente de que el usuario lo cree en el dashboard.
-- [x] Tabla `pilotos` (nombre, org, fecha de alta) — SQL listo en `supabase/schema.sql`.
-- [x] Tabla `resultados_test` (piloto_id, fecha, puntuaciones por elemento, respuestas crudas) — SQL listo en `supabase/schema.sql`, incluye políticas RLS para uso sin login.
-- [x] Conectar el frontend a Supabase (guardar resultado al enviar el test) — `js/supabaseClient.js` + `js/repository.js`, con degradación limpia si no hay conexión o faltan credenciales (probado con Playwright).
-- [x] Permitir repetir el test y conservar histórico (no sobrescribir resultados anteriores) — cada envío es un `insert` nuevo en `resultados_test`, nunca un `update`.
-- [ ] Pendiente: rellenar `SUPABASE_URL` / `SUPABASE_ANON_KEY` reales en `js/supabaseClient.js` una vez creado el proyecto.
+Supabase quedó bloqueado por un incidente de GitHub (login OAuth caído)
+justo al crear el proyecto. En vez de esperar, se optó por reutilizar
+la infraestructura ya probada en la Pi (mismo patrón que el server de
+APEX QRF): Express + Prisma + SQLite + Docker + Cloudflare Tunnel.
+
+- [x] Backend `server/` (Express + Prisma + SQLite) — modelos `Piloto` y `Resultado`, migración inicial generada, compilado y probado localmente (curl + Playwright end-to-end, incluyendo deduplicación de piloto por nombre case-insensitive).
+- [x] Endpoint `POST /api/resultados` — hace *get-or-create* del piloto y siempre inserta un `Resultado` nuevo (nunca `update`), conservando histórico.
+- [x] Conectar el frontend a la API — `js/apiClient.js` + `js/repository.js` (sustituyen a `js/supabaseClient.js`, eliminado junto con `supabase/schema.sql`).
+- [x] Desplegado el contenedor `pilot-psych-api` en la Pi (`~/pilot-psych-test/server`, puerto 8788, nombre de proyecto Docker Compose explícito para no colisionar con `apex-qrf-server`).
+- [x] Public Hostname añadida en el tunnel `starcrew-rpi` (Cloudflare Zero Trust): `pilotpsych-api.star-crew.es` → `http://localhost:8788`.
+- [x] URL pública real en `js/apiClient.js`, probado end-to-end contra producción con Playwright (sin errores de consola, "Guardado en el registro de la organización ✓"). Datos de prueba limpiados de la base de datos real tras verificar.
 
 ## Fase 3 — Panel de pilotos (vista de lista + análisis)
 

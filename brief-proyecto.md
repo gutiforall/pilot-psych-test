@@ -8,10 +8,10 @@ Web gratuita donde cada piloto de la organización de Star Citizen rellena un te
 
 Todos los pilotos de la organización, rellenando desde su propio dispositivo. No requiere login complejo — con nombre de piloto es suficiente (a decidir si se añade algo de identificación simple para evitar duplicados/impostores).
 
-## Stack (gratuito)
+## Stack
 
-- **Frontend:** GitHub Pages (HTML/CSS/JS estático)
-- **Base de datos:** Supabase (capa gratuita — Postgres + cliente JS desde el frontend, sin backend propio)
+- **Frontend:** GitHub Pages (HTML/CSS/JS estático) — repo público [`pilot-psych-test`](https://github.com/gutiforall/pilot-psych-test)
+- **Base de datos / API:** backend propio (Express + Prisma + SQLite) auto-alojado en la Raspberry Pi del usuario, expuesto vía Cloudflare Tunnel — mismo patrón que el server de APEX QRF (`SC PLAN/server`). *Pivote respecto al plan original (Supabase): el 17/08/2026 un incidente de GitHub bloqueaba el login OAuth necesario para crear el proyecto Supabase, y la Pi ya tenía infraestructura de despliegue probada (Docker + Cloudflare Tunnel), así que se optó por reutilizarla en vez de esperar.*
 - **Análisis:** por reglas/plantillas de texto en JavaScript — NO se usa ningún LLM en producción (evita coste y exposición de API keys en un sitio estático)
 - **Gráficos:** Chart.js (radar chart de 4 ejes por piloto)
 
@@ -28,10 +28,10 @@ Todos los pilotos de la organización, rellenando desde su propio dispositivo. N
 - Se guarda histórico: cada piloto puede repetir el test y se conservan los resultados anteriores, no se sobrescriben.
 - El análisis es 100% por reglas locales (JS), no por IA en producción.
 
-## Modelo de datos sugerido (Supabase)
+## Modelo de datos (Prisma/SQLite, `server/prisma/schema.prisma`)
 
-- **`pilotos`**: id, nombre, org (fijo: APEX SYNDICATE), fecha_alta
-- **`resultados_test`**: id, piloto_id (FK), fecha, puntuacion_aire, puntuacion_agua, puntuacion_tierra, puntuacion_fuego, respuestas_crudas (JSON)
+- **`Piloto`**: id, nombre, org (fijo: APEX SYNDICATE), fechaAlta
+- **`Resultado`**: id, pilotoId (FK), fecha, puntuacionAire, puntuacionAgua, puntuacionTierra, puntuacionFuego, respuestaDudosa, respuestasCrudas (JSON serializado como texto)
 
 ## Cómo usar este paquete en Claude Code
 

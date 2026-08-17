@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Piloto {
+  id        String     @id @default(cuid())
+  nombre    String
+  org       String     @default("APEX SYNDICATE")
+  fechaAlta DateTime   @default(now())
+  resultados Resultado[]
+}
+
+model Resultado {
+  id                String   @id @default(cuid())
+  pilotoId          String
+  piloto            Piloto   @relation(fields: [pilotoId], references: [id], onDelete: Cascade)
+  fecha             DateTime @default(now())
+  puntuacionAire    Float
+  puntuacionAgua    Float
+  puntuacionTierra  Float
+  puntuacionFuego   Float
+  respuestaDudosa   Boolean  @default(false)
+  respuestasCrudas  String // JSON.stringify de las respuestas 1-5 por pregunta
+
+  @@index([pilotoId])
+}
