@@ -61,9 +61,10 @@ APEX QRF): Express + Prisma + SQLite + Docker + Cloudflare Tunnel.
 
 ## Fase 4 — Despliegue y pulido
 
-- [ ] Publicar en GitHub Pages
-- [ ] Revisar responsive (uso previsto principalmente desde móvil)
-- [ ] Compartir enlace con la organización
+- [x] Publicar la web — servida desde la Raspberry Pi (contenedor `pilot-psych-web`, nginx estático) en vez de GitHub Pages, mismo motivo que la Fase 2: Pages también está afectado por el incidente de GitHub del 17/08/2026 (intento de activarlo dio 503). GitHub Pages quedó activado igualmente como espejo de respaldo (`https://gutiforall.github.io/pilot-psych-test/`) y terminará de compilar solo cuando el incidente se resuelva, pero **el link real a repartir es el de la Pi**.
+- [x] **Link para los pilotos: `https://pilotpsych.star-crew.es/`** — probado de extremo a extremo en producción real (Playwright: rellenar test público → guardar en API pública → confirmación "Guardado en el registro de la organización ✓"), sin login, solo nombre de piloto.
+- [ ] Revisar responsive (uso previsto principalmente desde móvil) — pendiente de prueba manual en dispositivo real.
+- [ ] Compartir enlace con la organización.
 
 ---
 

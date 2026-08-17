@@ -1,0 +1,9 @@
+name: pilot-psych-web
+
+services:
+  pilot-psych-web:
+    build: .
+    container_name: pilot-psych-web
+    restart: unless-stopped
+    ports:
+      - "8789:80"
