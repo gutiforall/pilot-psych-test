@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-4.1-mini";
 const TIMEOUT_MS = 15_000;
 
 const client = process.env.OPENAI_API_KEY ? new OpenAI({ timeout: TIMEOUT_MS }) : null;
