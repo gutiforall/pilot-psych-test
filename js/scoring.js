@@ -23,13 +23,17 @@ export function computeScores(answers) {
     percentages[el] = total > 0 ? (sums[el] / total) * 100 : 0;
   }
 
+  return { sums, percentages, ...rankPercentages(percentages) };
+}
+
+// Reutilizable tanto para un resultado recién calculado (computeScores)
+// como para porcentajes ya guardados que vuelven de la API (panel de pilotos).
+export function rankPercentages(percentages) {
   const ranking = [...ELEMENTS].sort((a, b) => percentages[b] - percentages[a]);
   const [dominant, secondary] = ranking;
   const gap = percentages[dominant] - percentages[secondary];
 
   return {
-    sums,
-    percentages,
     ranking,
     dominant,
     secondary,

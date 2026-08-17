@@ -26,6 +26,7 @@ model Resultado {
   puntuacionFuego   Float
   respuestaDudosa   Boolean  @default(false)
   respuestasCrudas  String // JSON.stringify de las respuestas 1-5 por pregunta
+  analisisPersonalizado String? // Generado por IA solo en envíos nuevos; null en resultados antiguos
 
   @@index([pilotoId])
 }

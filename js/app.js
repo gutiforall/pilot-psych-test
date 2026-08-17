@@ -1,10 +1,10 @@
-import { QUESTIONS, ELEMENTS, ELEMENT_LABELS, ELEMENT_ICONS } from "./data.js";
+import { QUESTIONS } from "./data.js";
 import { computeScores, checkValidity, getAnalysis, isQuestionComplete, allQuestionsComplete } from "./scoring.js";
 import { saveResult } from "./repository.js";
+import { renderResultBody, renderAiAnalysisCard, drawRadarChart, escapeHtml } from "./resultView.js";
 
 const STORAGE_KEY = "sc-perfil-tactico:draft";
 const SCALE_LABELS = { 1: "No lo haría", 2: "Poco probable", 3: "Podría hacerlo", 4: "Bastante mi estilo", 5: "Así soy" };
-const ELEMENT_COLORS = { aire: "#3d7a8c", agua: "#2f5fa8", tierra: "#8a6024", fuego: "#b8431f" };
 
 const app = document.getElementById("app");
 
@@ -63,6 +63,7 @@ function renderStart() {
         <button type="submit" class="btn btn-primary">Comenzar</button>
       </form>
       ${hasDraft ? `<button class="btn btn-ghost" id="resume-btn">Continuar como ${escapeHtml(draft.nombre)} — pregunta ${draft.currentIndex + 1} de ${QUESTIONS.length}</button>` : ""}
+      <a class="nav-link" href="pilotos.html">Ver pilotos de la organización →</a>
     </div>
   `;
 
@@ -180,45 +181,21 @@ function renderResult() {
   const scores = computeScores(state.answers);
   const validity = checkValidity(state.answers);
   const analysis = getAnalysis(scores);
-  const sortedPct = ELEMENTS.map((el) => ({ el, pct: scores.percentages[el] })).sort((a, b) => b.pct - a.pct);
 
   app.innerHTML = `
     <div class="screen screen-result">
       <p class="eyebrow">Resultado de ${escapeHtml(state.nombre)}</p>
       <p class="save-status save-pending" id="save-status">Guardando resultado…</p>
-      <h1 class="result-title">
-        ${ELEMENT_ICONS[scores.dominant]} ${ELEMENT_LABELS[scores.dominant]}${
-          scores.isTied ? ` / ${ELEMENT_ICONS[scores.secondary]} ${ELEMENT_LABELS[scores.secondary]}` : ""
-        }
-      </h1>
-      <p class="result-subtitle">${scores.isTied ? "Perfil equilibrado entre dos elementos" : scores.isMarked ? "Perfil muy marcado" : "Perfil equilibrado"}</p>
-
-      <div class="chart-wrap"><canvas id="radar-chart"></canvas></div>
-
-      <div class="pct-bars">
-        ${sortedPct
-          .map(
-            ({ el, pct }) => `
-          <div class="pct-row">
-            <span class="pct-label" style="color:${ELEMENT_COLORS[el]}">${ELEMENT_ICONS[el]} ${ELEMENT_LABELS[el]}</span>
-            <div class="pct-track"><div class="pct-fill" style="width:${pct}%;background:${ELEMENT_COLORS[el]}"></div></div>
-            <span class="pct-value">${pct.toFixed(1)}%</span>
-          </div>`
-          )
-          .join("")}
-      </div>
-
-      ${validity.respuestaDudosa ? `<p class="notice">Este resultado se ha marcado internamente para revisión (respuestas de control inconsistentes).</p>` : ""}
-
-      ${renderAnalysisCard(analysis.primary, ELEMENT_LABELS[scores.dominant], ELEMENT_LABELS[scores.secondary])}
-      ${analysis.hybrid ? renderAnalysisCard(analysis.secondary, ELEMENT_LABELS[scores.secondary], ELEMENT_LABELS[scores.dominant]) : ""}
-
+      ${renderResultBody({ scores, analysis, validity })}
+      <div id="ai-analysis-slot"></div>
       <button class="btn btn-ghost" id="restart-btn">Repetir test</button>
+      <a class="nav-link" href="pilotos.html">Ver pilotos de la organización →</a>
     </div>
   `;
 
-  drawRadarChart(scores);
-  persistResult(scores, validity);
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = drawRadarChart("radar-chart", scores);
+  persistResult(scores, validity, analysis);
 
   document.getElementById("restart-btn").addEventListener("click", () => {
     clearDraft();
@@ -227,86 +204,46 @@ function renderResult() {
   });
 }
 
-async function persistResult(scores, validity) {
+// Texto de cada opción + puntuación 1-5, para que el análisis con IA pueda
+// citar patrones concretos de las respuestas del piloto (no solo el % final).
+function buildRespuestasLegibles(answers) {
+  return QUESTIONS.filter((q) => q.block !== "control").map((q) => ({
+    pregunta: q.title,
+    opciones: q.options.map((o) => ({
+      letra: o.letter,
+      texto: o.text,
+      elemento: o.element,
+      puntuacion: answers[q.id]?.[o.letter] ?? null,
+    })),
+  }));
+}
+
+async function persistResult(scores, validity, analysis) {
   const statusEl = document.getElementById("save-status");
   try {
-    await saveResult({
+    const saved = await saveResult({
       nombre: state.nombre,
       scores,
-      respuestaDudosa: validity.respuestaDudosa,
+      validity,
+      analysis,
       answers: state.answers,
+      respuestasLegibles: buildRespuestasLegibles(state.answers),
     });
     clearDraft();
     if (statusEl) {
       statusEl.textContent = "Guardado en el registro de la organización ✓";
       statusEl.className = "save-status save-ok";
     }
+    const aiSlot = document.getElementById("ai-analysis-slot");
+    if (aiSlot && saved?.resultado?.analisisPersonalizado) {
+      aiSlot.innerHTML = renderAiAnalysisCard(saved.resultado.analisisPersonalizado);
+    }
   } catch (err) {
-    console.error("No se pudo guardar el resultado en Supabase:", err);
+    console.error("No se pudo guardar el resultado:", err);
     if (statusEl) {
-      statusEl.textContent = "No se pudo guardar (sin conexión o Supabase no configurado) — tu resultado sigue visible aquí.";
+      statusEl.textContent = "No se pudo guardar (sin conexión con el servidor) — tu resultado sigue visible aquí.";
       statusEl.className = "save-status save-error";
     }
   }
 }
 
-function renderAnalysisCard(text, dominantLabel, secondaryLabel) {
-  if (!text) return "";
-  return `
-    <div class="analysis-card">
-      <p class="analysis-combo">${dominantLabel} → ${secondaryLabel}</p>
-      <p>${escapeHtml(text.descripcion)}</p>
-      <dl>
-        <dt>Fortaleza</dt><dd>${escapeHtml(text.fortaleza)}</dd>
-        <dt>Debilidad</dt><dd>${escapeHtml(text.debilidad)}</dd>
-        <dt>Rol natural</dt><dd>${escapeHtml(text.rolNatural)}</dd>
-      </dl>
-    </div>
-  `;
-}
-
-function drawRadarChart(scores) {
-  const ctx = document.getElementById("radar-chart");
-  const values = ELEMENTS.map((el) => scores.percentages[el]);
-  // Los 4 % suman 100, así que el máximo real ronda 60-65 (caso extremo) y
-  // lo típico son 25-45. Una escala fija 0-100 aplasta el diamante en el
-  // centro; se ajusta al valor más alto de este resultado en su lugar.
-  const axisMax = Math.max(40, Math.ceil((Math.max(...values) + 10) / 10) * 10);
-
-  if (chartInstance) chartInstance.destroy();
-  chartInstance = new Chart(ctx, {
-    type: "radar",
-    data: {
-      labels: ELEMENTS.map((el) => `${ELEMENT_ICONS[el]} ${ELEMENT_LABELS[el]}`),
-      datasets: [
-        {
-          data: values,
-          backgroundColor: "rgba(184, 67, 31, 0.15)",
-          borderColor: "#b8431f",
-          pointBackgroundColor: ELEMENTS.map((el) => ELEMENT_COLORS[el]),
-          borderWidth: 2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        r: {
-          min: 0,
-          max: axisMax,
-          ticks: { display: false },
-          grid: { color: "rgba(255,255,255,0.12)" },
-          angleLines: { color: "rgba(255,255,255,0.12)" },
-          pointLabels: { color: "#ece5d6", font: { size: 13 } },
-        },
-      },
-    },
-  });
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}

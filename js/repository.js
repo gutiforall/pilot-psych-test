@@ -1,6 +1,6 @@
 import { API_BASE_URL, isApiConfigured } from "./apiClient.js";
 
-export async function saveResult({ nombre, scores, respuestaDudosa, answers }) {
+export async function saveResult({ nombre, scores, validity, analysis, answers, respuestasLegibles }) {
   if (!isApiConfigured) {
     throw new Error("La API todavía no está configurada (ver js/apiClient.js).");
   }
@@ -14,8 +14,12 @@ export async function saveResult({ nombre, scores, respuestaDudosa, answers }) {
       puntuacionAgua: scores.percentages.agua,
       puntuacionTierra: scores.percentages.tierra,
       puntuacionFuego: scores.percentages.fuego,
-      respuestaDudosa,
+      respuestaDudosa: validity.respuestaDudosa,
       respuestasCrudas: answers,
+      dominant: scores.dominant,
+      secondary: scores.secondary,
+      analisisBase: analysis.primary ?? null,
+      respuestasLegibles,
     }),
   });
 
@@ -23,4 +27,6 @@ export async function saveResult({ nombre, scores, respuestaDudosa, answers }) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || `Error del servidor (${response.status})`);
   }
+
+  return response.json();
 }

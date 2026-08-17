@@ -53,11 +53,18 @@ APEX QRF): Express + Prisma + SQLite + Docker + Cloudflare Tunnel.
 - [x] Public Hostname añadida en el tunnel `starcrew-rpi` (Cloudflare Zero Trust): `pilotpsych-api.star-crew.es` → `http://localhost:8788`.
 - [x] URL pública real en `js/apiClient.js`, probado end-to-end contra producción con Playwright (sin errores de consola, "Guardado en el registro de la organización ✓"). Datos de prueba limpiados de la base de datos real tras verificar.
 
-## Fase 3 — Panel de pilotos (vista de lista + análisis)
+## Fase 3 — Panel de pilotos (vista de lista + análisis) ✅ completada
 
-- [ ] Listado de todos los pilotos con su elemento dominante
-- [ ] Ficha individual por piloto: porcentajes actuales, radar chart, texto de análisis, evolución si hay más de un test guardado
-- [ ] (Opcional) Comparativa entre dos pilotos, tipo la que se hizo manualmente entre Malgamis/Tiamat
+Nuevos endpoints `GET /api/pilotos` y `GET /api/pilotos/:id` en el
+backend. `js/resultView.js` extrae el renderizado de resultado
+(barras, radar, tarjetas de análisis) para reutilizarlo entre la
+pantalla de resultado del test y la ficha de piloto.
+
+- [x] Listado (`pilotos.html`) — todos los pilotos con su elemento dominante (y secundario si hay empate), según su último resultado.
+- [x] Ficha individual (`piloto.html?id=...`) — porcentajes actuales, radar chart, texto de análisis, historial completo si repitió el test más de una vez.
+- [ ] (Opcional, no hecho) Comparativa entre dos pilotos, tipo la que se hizo manualmente entre Malgamis/Tiamat.
+
+**Bug encontrado y corregido durante el despliegue:** Cloudflare cacheaba el JS/HTML del sitio 4h (`Cache-Control: max-age=14400` inyectado por Cloudflare, no por nginx), así que tras cada redeploy los visitantes seguían viendo la versión anterior hasta que expiraba la caché. Solucionado añadiendo `nginx.conf` con `Cache-Control: no-cache, must-revalidate` explícito en el origen — evita que vuelva a pasar en futuros despliegues. Requirió una purga manual de caché en el dashboard de Cloudflare para aplicar el fix a los archivos ya cacheados.
 
 ## Fase 4 — Despliegue y pulido
 
