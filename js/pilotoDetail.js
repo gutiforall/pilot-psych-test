@@ -1,6 +1,7 @@
-import { ELEMENT_LABELS, ELEMENT_ICONS } from "./data.js";
-import { rankPercentages, getAnalysis } from "./scoring.js";
-import { renderResultBody, renderAiAnalysisCard, drawRadarChart, escapeHtml, ELEMENT_COLORS } from "./resultView.js";
+import { TRAIT_LABELS, TRAIT_ICONS } from "./data.js";
+import { rankTraits, suggestRoles } from "./scoring.js";
+import { renderResultBody, renderAiAnalysisCard, drawRadarChart, escapeHtml, TRAIT_COLORS } from "./resultView.js";
+import { drawMonster } from "./monster.js";
 import { API_BASE_URL, isApiConfigured } from "./apiClient.js";
 
 const content = document.getElementById("piloto-content");
@@ -34,13 +35,15 @@ async function load() {
 }
 
 function toScores(r) {
-  const percentages = {
-    aire: r.puntuacionAire,
-    agua: r.puntuacionAgua,
-    tierra: r.puntuacionTierra,
-    fuego: r.puntuacionFuego,
+  const sums = {
+    rie: r.puntuacionRiesgo,
+    cau: r.puntuacionCautela,
+    coo: r.puntuacionCooperacion,
+    dis: r.puntuacionDisciplina,
+    ini: r.puntuacionIniciativa,
+    lid: r.puntuacionLiderazgo,
   };
-  return { percentages, ...rankPercentages(percentages) };
+  return { sums, ...rankTraits(sums) };
 }
 
 function render(piloto) {
@@ -57,19 +60,20 @@ function render(piloto) {
 
   const [latest, ...previous] = piloto.resultados;
   const scores = toScores(latest);
-  const analysis = getAnalysis(scores);
-  const validity = { respuestaDudosa: latest.respuestaDudosa };
+  const roles = suggestRoles(scores.tiers);
 
   content.innerHTML = `
     <p class="eyebrow">Ficha de piloto</p>
     <h1 class="pilot-detail-name">${escapeHtml(piloto.nombre)}</h1>
     <p class="lede">Resultado actual — ${formatFecha(latest.fecha)}</p>
-    ${renderResultBody({ scores, analysis, validity })}
+    <div class="monster-wrap"><canvas id="monster-canvas"></canvas></div>
+    ${renderResultBody({ scores, roles })}
     ${renderAiAnalysisCard(latest.analisisPersonalizado)}
     ${previous.length > 0 ? renderHistory(previous, piloto.resultados.length) : ""}
   `;
 
   drawRadarChart("radar-chart", scores);
+  drawMonster("monster-canvas", scores);
 }
 
 function renderHistory(previous, total) {
@@ -79,13 +83,15 @@ function renderHistory(previous, total) {
       ${previous
         .map((r) => {
           const s = toScores(r);
+          const roles = suggestRoles(s.tiers);
+          const label =
+            roles.length > 0
+              ? roles.map((role) => role.nombre).join(" / ")
+              : `${TRAIT_ICONS[s.dominant]} ${TRAIT_LABELS[s.dominant]} / ${TRAIT_ICONS[s.secondary]} ${TRAIT_LABELS[s.secondary]}`;
           return `
           <div class="history-row">
             <span class="history-date">${formatFecha(r.fecha)}</span>
-            <span class="history-dominant" style="color:${ELEMENT_COLORS[s.dominant]}">
-              ${ELEMENT_ICONS[s.dominant]} ${ELEMENT_LABELS[s.dominant]}${s.isTied ? ` / ${ELEMENT_ICONS[s.secondary]} ${ELEMENT_LABELS[s.secondary]}` : ""}
-            </span>
-            ${r.respuestaDudosa ? `<span class="history-flag" title="Respuestas de control inconsistentes">⚑</span>` : ""}
+            <span class="history-dominant" style="color:${TRAIT_COLORS[s.dominant]}">${label}</span>
           </div>`;
         })
         .join("")}

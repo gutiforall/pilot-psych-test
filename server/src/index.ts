@@ -28,23 +28,30 @@ async function getOrCreatePiloto(nombre: string) {
 app.post("/api/resultados", async (req, res) => {
   const {
     nombre,
-    puntuacionAire,
-    puntuacionAgua,
-    puntuacionTierra,
-    puntuacionFuego,
-    respuestaDudosa,
+    puntuacionRiesgo,
+    puntuacionCautela,
+    puntuacionCooperacion,
+    puntuacionDisciplina,
+    puntuacionIniciativa,
+    puntuacionLiderazgo,
     respuestasCrudas,
+    comentarios,
     dominant,
     secondary,
-    analisisBase,
+    roles,
     respuestasLegibles,
   } = req.body ?? {};
 
-  if (
-    typeof nombre !== "string" ||
-    !nombre.trim() ||
-    [puntuacionAire, puntuacionAgua, puntuacionTierra, puntuacionFuego].some((v) => typeof v !== "number")
-  ) {
+  const puntuaciones = [
+    puntuacionRiesgo,
+    puntuacionCautela,
+    puntuacionCooperacion,
+    puntuacionDisciplina,
+    puntuacionIniciativa,
+    puntuacionLiderazgo,
+  ];
+
+  if (typeof nombre !== "string" || !nombre.trim() || puntuaciones.some((v) => typeof v !== "number")) {
     return res.status(400).json({ error: "datos incompletos" });
   }
 
@@ -58,10 +65,17 @@ app.post("/api/resultados", async (req, res) => {
     if (dominant && secondary && Array.isArray(respuestasLegibles)) {
       analisisPersonalizado = await generatePersonalizedAnalysis({
         nombre: nombre.trim(),
-        percentages: { aire: puntuacionAire, agua: puntuacionAgua, tierra: puntuacionTierra, fuego: puntuacionFuego },
+        sums: {
+          riesgo: puntuacionRiesgo,
+          cautela: puntuacionCautela,
+          cooperacion: puntuacionCooperacion,
+          disciplina: puntuacionDisciplina,
+          iniciativa: puntuacionIniciativa,
+          liderazgo: puntuacionLiderazgo,
+        },
         dominant,
         secondary,
-        analisisBase: analisisBase ?? null,
+        roles: Array.isArray(roles) ? roles : [],
         respuestasLegibles,
       });
     }
@@ -69,12 +83,14 @@ app.post("/api/resultados", async (req, res) => {
     const resultado = await db.resultado.create({
       data: {
         pilotoId: piloto.id,
-        puntuacionAire,
-        puntuacionAgua,
-        puntuacionTierra,
-        puntuacionFuego,
-        respuestaDudosa: Boolean(respuestaDudosa),
+        puntuacionRiesgo,
+        puntuacionCautela,
+        puntuacionCooperacion,
+        puntuacionDisciplina,
+        puntuacionIniciativa,
+        puntuacionLiderazgo,
         respuestasCrudas: JSON.stringify(respuestasCrudas ?? {}),
+        comentarios: comentarios ? JSON.stringify(comentarios) : null,
         analisisPersonalizado,
       },
     });

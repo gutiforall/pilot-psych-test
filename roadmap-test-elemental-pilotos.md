@@ -1,3 +1,10 @@
+> **⚠️ SUPERSEDED (20/08/2026):** este sistema (4 elementos, puntuación
+> 1-5 normativa) fue sustituido por completo por el rediseño de 6
+> rasgos tácticos en formato ipsativo MÁS/MENOS. Ver
+> `roadmap-v2-rasgos-tacticos.md` para el sistema actual en
+> producción. Este archivo se conserva como historial real de las
+> Fases 0-4 originales, no se borra ni se actualiza.
+
 # Roadmap — Test de Perfil Táctico (4 Elementos) para APEX SYNDICATE
 
 Web gratuita para que los pilotos rellenen el cuestionario desde móvil/PC, con análisis psicológico automático y registro histórico por piloto.

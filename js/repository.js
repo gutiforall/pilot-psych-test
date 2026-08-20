@@ -1,6 +1,6 @@
 import { API_BASE_URL, isApiConfigured } from "./apiClient.js";
 
-export async function saveResult({ nombre, scores, validity, analysis, answers, respuestasLegibles }) {
+export async function saveResult({ nombre, scores, roles, answers, respuestasLegibles, comentarios }) {
   if (!isApiConfigured) {
     throw new Error("La API todavía no está configurada (ver js/apiClient.js).");
   }
@@ -10,15 +10,17 @@ export async function saveResult({ nombre, scores, validity, analysis, answers, 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       nombre,
-      puntuacionAire: scores.percentages.aire,
-      puntuacionAgua: scores.percentages.agua,
-      puntuacionTierra: scores.percentages.tierra,
-      puntuacionFuego: scores.percentages.fuego,
-      respuestaDudosa: validity.respuestaDudosa,
+      puntuacionRiesgo: scores.sums.rie,
+      puntuacionCautela: scores.sums.cau,
+      puntuacionCooperacion: scores.sums.coo,
+      puntuacionDisciplina: scores.sums.dis,
+      puntuacionIniciativa: scores.sums.ini,
+      puntuacionLiderazgo: scores.sums.lid,
       respuestasCrudas: answers,
+      comentarios,
       dominant: scores.dominant,
       secondary: scores.secondary,
-      analisisBase: analysis.primary ?? null,
+      roles: roles.map((r) => ({ nombre: r.nombre, blurb: r.blurb })),
       respuestasLegibles,
     }),
   });

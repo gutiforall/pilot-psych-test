@@ -1,6 +1,6 @@
-import { ELEMENT_LABELS, ELEMENT_ICONS } from "./data.js";
-import { rankPercentages } from "./scoring.js";
-import { escapeHtml, ELEMENT_COLORS } from "./resultView.js";
+import { TRAIT_LABELS, TRAIT_ICONS } from "./data.js";
+import { rankTraits, suggestRoles } from "./scoring.js";
+import { escapeHtml, TRAIT_COLORS } from "./resultView.js";
 import { API_BASE_URL, isApiConfigured } from "./apiClient.js";
 
 const listEl = document.getElementById("pilotos-list");
@@ -41,20 +41,25 @@ function render(pilotos) {
           </a>`;
       }
 
-      const percentages = {
-        aire: r.puntuacionAire,
-        agua: r.puntuacionAgua,
-        tierra: r.puntuacionTierra,
-        fuego: r.puntuacionFuego,
+      const sums = {
+        rie: r.puntuacionRiesgo,
+        cau: r.puntuacionCautela,
+        coo: r.puntuacionCooperacion,
+        dis: r.puntuacionDisciplina,
+        ini: r.puntuacionIniciativa,
+        lid: r.puntuacionLiderazgo,
       };
-      const ranked = rankPercentages(percentages);
+      const ranked = rankTraits(sums);
+      const roles = suggestRoles(ranked.tiers);
+      const label =
+        roles.length > 0
+          ? roles.map((role) => role.nombre).join(" / ")
+          : `${TRAIT_ICONS[ranked.dominant]} ${TRAIT_LABELS[ranked.dominant]} / ${TRAIT_ICONS[ranked.secondary]} ${TRAIT_LABELS[ranked.secondary]}`;
 
       return `
         <a class="pilot-row" href="piloto.html?id=${encodeURIComponent(piloto.id)}">
           <span class="pilot-name">${escapeHtml(piloto.nombre)}</span>
-          <span class="pilot-dominant" style="color:${ELEMENT_COLORS[ranked.dominant]}">
-            ${ELEMENT_ICONS[ranked.dominant]} ${ELEMENT_LABELS[ranked.dominant]}${ranked.isTied ? ` / ${ELEMENT_ICONS[ranked.secondary]} ${ELEMENT_LABELS[ranked.secondary]}` : ""}
-          </span>
+          <span class="pilot-dominant" style="color:${TRAIT_COLORS[ranked.dominant]}">${label}</span>
         </a>`;
     })
     .join("");

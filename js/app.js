@@ -1,10 +1,11 @@
-import { QUESTIONS } from "./data.js";
-import { computeScores, checkValidity, getAnalysis, isQuestionComplete, allQuestionsComplete } from "./scoring.js";
+import { QUESTIONS, TRAIT_LABELS } from "./data.js";
+import { computeScores, suggestRoles, isQuestionComplete, allQuestionsComplete } from "./scoring.js";
 import { saveResult } from "./repository.js";
 import { renderResultBody, renderAiAnalysisCard, drawRadarChart, escapeHtml } from "./resultView.js";
+import { drawMonster, downloadMonsterImage } from "./monster.js";
 
-const STORAGE_KEY = "sc-perfil-tactico:draft";
-const SCALE_LABELS = { 1: "No lo haría", 2: "Poco probable", 3: "Podría hacerlo", 4: "Bastante mi estilo", 5: "Así soy" };
+const STORAGE_KEY = "sc-perfil-tactico:draft-v2";
+const COMMENT_MAX = 200;
 
 const app = document.getElementById("app");
 
@@ -13,6 +14,7 @@ const app = document.getElementById("app");
 // de nuevo en vez de que la app lo devuelva a la pregunta a la fuerza.
 let state = { nombre: "", answers: {}, currentIndex: 0 };
 let chartInstance = null;
+let stopMonster = null;
 
 render();
 
@@ -54,7 +56,7 @@ function renderStart() {
     <div class="screen screen-start">
       <p class="eyebrow">APEX SYNDICATE</p>
       <h1>Test de Perfil Táctico</h1>
-      <p class="lede">23 preguntas sobre cómo actúas en combate y fuera de él. Puntúa cada opción de 1 a 5 según cuánto se parece a lo que harías. Tarda unos 8-10 minutos.</p>
+      <p class="lede">20 preguntas sobre cómo actúas en combate y en el squad. En cada una, marca la opción que MÁS se parece a ti y la que MENOS — las otras dos se quedan sin marcar. Tarda unos 8-10 minutos.</p>
       <form id="start-form">
         <label class="field">
           <span>Nombre de piloto</span>
@@ -87,9 +89,10 @@ function renderStart() {
 
 function renderQuestion() {
   const question = QUESTIONS[state.currentIndex];
-  const answers = state.answers[question.id] || {};
   const total = QUESTIONS.length;
   const progressPct = Math.round((state.currentIndex / total) * 100);
+  state.answers[question.id] = state.answers[question.id] || { mas: null, menos: null, comentario: "" };
+  const given = state.answers[question.id];
 
   app.innerHTML = `
     <div class="screen screen-question">
@@ -98,8 +101,13 @@ function renderQuestion() {
       </div>
       <p class="progress-label">Pregunta ${state.currentIndex + 1} de ${total}</p>
       <h2 class="q-title">${escapeHtml(question.title)}</h2>
-      <p class="q-hint">Puntúa cada opción de 1 a 5 según cuánto se parece a lo que harías.</p>
+      <p class="q-hint">Marca cuál es MÁS parecida a ti y cuál es MENOS. Las otras dos, sin marcar.</p>
       <div class="options" id="options"></div>
+      <label class="comment-field">
+        <span>Comentario opcional</span>
+        <textarea id="comentario" maxlength="${COMMENT_MAX}" placeholder="Matiza tu elección si depende de la situación (opcional)">${escapeHtml(given.comentario || "")}</textarea>
+        <span class="comment-count" id="comment-count">${(given.comentario || "").length}/${COMMENT_MAX}</span>
+      </label>
       <div class="nav-buttons">
         <button class="btn btn-ghost" id="back-btn" ${state.currentIndex === 0 ? "disabled" : ""}>Atrás</button>
         <button class="btn btn-primary" id="next-btn" disabled>${state.currentIndex === total - 1 ? "Ver resultado" : "Siguiente"}</button>
@@ -107,12 +115,14 @@ function renderQuestion() {
     </div>
   `;
 
-  const optionsEl = document.getElementById("options");
-  for (const option of question.options) {
-    optionsEl.appendChild(buildOptionRow(question, option, answers[option.letter]));
-  }
+  renderOptions(question, given);
 
-  updateNextState(question);
+  const commentEl = document.getElementById("comentario");
+  commentEl.addEventListener("input", () => {
+    given.comentario = commentEl.value;
+    document.getElementById("comment-count").textContent = `${commentEl.value.length}/${COMMENT_MAX}`;
+    saveDraft();
+  });
 
   document.getElementById("back-btn").addEventListener("click", () => {
     state.currentIndex -= 1;
@@ -128,41 +138,54 @@ function renderQuestion() {
   });
 }
 
-function buildOptionRow(question, option, currentValue) {
-  const row = document.createElement("div");
-  row.className = "option-row";
+function renderOptions(question, given) {
+  const optionsEl = document.getElementById("options");
+  optionsEl.innerHTML = "";
 
-  const text = document.createElement("p");
-  text.className = "option-text";
-  text.innerHTML = `<span class="option-letter">${option.letter}</span> ${escapeHtml(option.text)}`;
-  row.appendChild(text);
+  for (const option of question.options) {
+    const row = document.createElement("div");
+    row.className = "option-row";
 
-  const scale = document.createElement("div");
-  scale.className = "scale";
-  for (let value = 1; value <= 5; value += 1) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "scale-btn";
-    btn.textContent = String(value);
-    btn.title = SCALE_LABELS[value];
-    btn.setAttribute("aria-pressed", String(currentValue === value));
-    if (currentValue === value) btn.classList.add("selected");
-    btn.addEventListener("click", () => {
-      state.answers[question.id] = state.answers[question.id] || {};
-      state.answers[question.id][option.letter] = value;
+    const text = document.createElement("p");
+    text.className = "option-text";
+    text.innerHTML = `<span class="option-letter">${option.letter}</span> ${escapeHtml(option.text)}`;
+    row.appendChild(text);
+
+    const toggles = document.createElement("div");
+    toggles.className = "mas-menos";
+
+    const masBtn = buildToggle("MÁS", given.mas === option.letter, () => {
+      given.mas = given.mas === option.letter ? null : option.letter;
+      if (given.menos === option.letter) given.menos = null;
       saveDraft();
-      scale.querySelectorAll(".scale-btn").forEach((b) => {
-        b.classList.remove("selected");
-        b.setAttribute("aria-pressed", "false");
-      });
-      btn.classList.add("selected");
-      btn.setAttribute("aria-pressed", "true");
+      renderOptions(question, given);
       updateNextState(question);
     });
-    scale.appendChild(btn);
+    const menosBtn = buildToggle("MENOS", given.menos === option.letter, () => {
+      given.menos = given.menos === option.letter ? null : option.letter;
+      if (given.mas === option.letter) given.mas = null;
+      saveDraft();
+      renderOptions(question, given);
+      updateNextState(question);
+    });
+
+    toggles.appendChild(masBtn);
+    toggles.appendChild(menosBtn);
+    row.appendChild(toggles);
+    optionsEl.appendChild(row);
   }
-  row.appendChild(scale);
-  return row;
+
+  updateNextState(question);
+}
+
+function buildToggle(label, selected, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `toggle-btn toggle-${label === "MÁS" ? "mas" : "menos"}${selected ? " selected" : ""}`;
+  btn.textContent = label;
+  btn.setAttribute("aria-pressed", String(selected));
+  btn.addEventListener("click", onClick);
+  return btn;
 }
 
 function updateNextState(question) {
@@ -179,14 +202,19 @@ function renderResult() {
   }
 
   const scores = computeScores(state.answers);
-  const validity = checkValidity(state.answers);
-  const analysis = getAnalysis(scores);
+  const roles = suggestRoles(scores.tiers);
 
   app.innerHTML = `
     <div class="screen screen-result">
       <p class="eyebrow">Resultado de ${escapeHtml(state.nombre)}</p>
       <p class="save-status save-pending" id="save-status">Guardando resultado…</p>
-      ${renderResultBody({ scores, analysis, validity })}
+
+      <div class="monster-wrap">
+        <canvas id="monster-canvas"></canvas>
+        <button class="btn btn-ghost btn-small" id="download-monster">Descargar imagen</button>
+      </div>
+
+      ${renderResultBody({ scores, roles })}
       <div id="ai-analysis-slot"></div>
       <button class="btn btn-ghost" id="restart-btn">Repetir test</button>
       <a class="nav-link" href="pilotos.html">Ver pilotos de la organización →</a>
@@ -195,7 +223,15 @@ function renderResult() {
 
   if (chartInstance) chartInstance.destroy();
   chartInstance = drawRadarChart("radar-chart", scores);
-  persistResult(scores, validity, analysis);
+
+  if (stopMonster) stopMonster();
+  stopMonster = drawMonster("monster-canvas", scores);
+
+  document.getElementById("download-monster").addEventListener("click", () => {
+    downloadMonsterImage("monster-canvas", `perfil-tactico-${state.nombre.replace(/\s+/g, "-").toLowerCase()}.png`);
+  });
+
+  persistResult(scores, roles);
 
   document.getElementById("restart-btn").addEventListener("click", () => {
     clearDraft();
@@ -204,30 +240,44 @@ function renderResult() {
   });
 }
 
-// Texto de cada opción + puntuación 1-5, para que el análisis con IA pueda
-// citar patrones concretos de las respuestas del piloto (no solo el % final).
+// Texto legible de cada pregunta (con qué se marcó MÁS/MENOS y el
+// comentario si lo hay), para que el análisis con IA pueda citar
+// patrones concretos en vez de repetir el rol genérico.
 function buildRespuestasLegibles(answers) {
-  return QUESTIONS.filter((q) => q.block !== "control").map((q) => ({
-    pregunta: q.title,
-    opciones: q.options.map((o) => ({
-      letra: o.letter,
-      texto: o.text,
-      elemento: o.element,
-      puntuacion: answers[q.id]?.[o.letter] ?? null,
-    })),
-  }));
+  return QUESTIONS.map((q) => {
+    const given = answers[q.id];
+    return {
+      pregunta: q.title,
+      opciones: q.options.map((o) => ({
+        letra: o.letter,
+        texto: o.text,
+        rasgo: TRAIT_LABELS[o.trait],
+        marcado: given.mas === o.letter ? "MÁS" : given.menos === o.letter ? "MENOS" : null,
+      })),
+      comentario: given.comentario?.trim() || null,
+    };
+  });
 }
 
-async function persistResult(scores, validity, analysis) {
+function buildComentarios(answers) {
+  const comentarios = {};
+  for (const q of QUESTIONS) {
+    const texto = answers[q.id]?.comentario?.trim();
+    if (texto) comentarios[q.id] = texto;
+  }
+  return Object.keys(comentarios).length > 0 ? comentarios : null;
+}
+
+async function persistResult(scores, roles) {
   const statusEl = document.getElementById("save-status");
   try {
     const saved = await saveResult({
       nombre: state.nombre,
       scores,
-      validity,
-      analysis,
+      roles,
       answers: state.answers,
       respuestasLegibles: buildRespuestasLegibles(state.answers),
+      comentarios: buildComentarios(state.answers),
     });
     clearDraft();
     if (statusEl) {
@@ -246,4 +296,3 @@ async function persistResult(scores, validity, analysis) {
     }
   }
 }
-
